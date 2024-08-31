@@ -1,0 +1,6 @@
+../libs/DEV_Config.c:39:6:DEV_delay_ms	16	static
+../libs/DEV_Config.c:45:6:DEV_SPI_WRite	16	static
+../libs/DEV_Config.c:50:5:DEV_Module_Init	8	static
+../libs/DEV_Config.c:59:6:DEV_Module_Exit	8	static
+../libs/DEV_Config.c:70:6:DEV_SPI_WriteBuffer	16	static
+../libs/DEV_Config.c:74:6:HAL_SPI_TxCpltCallback	16	static

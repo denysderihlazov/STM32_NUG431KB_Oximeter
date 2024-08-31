@@ -1,0 +1,13 @@
+../libs/LCD_1in47.c:26:13:LCD_1IN47_Reset	1
+../libs/LCD_1in47.c:41:13:LCD_1IN47_SendCommand	1
+../libs/LCD_1in47.c:54:13:LCD_1IN47_SendData_8Bit	1
+../libs/LCD_1in47.c:67:13:LCD_1IN47_SendData_16Bit	1
+../libs/LCD_1in47.c:80:13:LCD_1IN47_InitReg	1
+../libs/LCD_1in47.c:167:13:LCD_1IN47_SetAttributes	2
+../libs/LCD_1in47.c:197:6:LCD_1IN47_Init	1
+../libs/LCD_1in47.c:217:6:LCD_1IN47_SetWindows	2
+../libs/LCD_1in47.c:260:6:LCD_1IN47_Clear	3
+../libs/LCD_1in47.c:279:6:LCD_1IN47_Display	3
+../libs/LCD_1in47.c:293:6:LCD_1IN47_DisplayWindows	3
+../libs/LCD_1in47.c:310:6:LCD_1IN47_DrawPoint	1
+../libs/LCD_1in47.c:316:6:LCD_1IN47_SetBackLight	1

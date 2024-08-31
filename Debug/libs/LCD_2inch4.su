@@ -1,0 +1,12 @@
+../libs/LCD_2inch4.c:36:13:LCD_2IN4_Reset	8	static
+../libs/LCD_2inch4.c:50:13:LCD_2IN4_Write_Command	16	static
+../libs/LCD_2inch4.c:57:13:LCD_2IN4_WriteData_Byte	16	static
+../libs/LCD_2inch4.c:65:6:LCD_2IN4_WriteData_Word	16	static
+../libs/LCD_2inch4.c:78:6:LCD_2IN4_Init	8	static
+../libs/LCD_2inch4.c:184:6:LCD_2IN4_SetWindow	24	static
+../libs/LCD_2inch4.c:208:6:LCD_2IN4_SetCursor	16	static
+../libs/LCD_2inch4.c:230:6:LCD_2IN4_Clear	24	static
+../libs/LCD_2inch4.c:252:6:LCD_2IN4_ClearWindow	32	static
+../libs/LCD_2inch4.c:268:6:LCD_2IN4_Display	24	static
+../libs/LCD_2inch4.c:288:6:LCD_2IN4_DrawPaint	16	static
+../libs/LCD_2inch4.c:299:6:LCD_2IN4_SetBackLight	16	static
