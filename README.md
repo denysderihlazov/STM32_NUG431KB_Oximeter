@@ -2,13 +2,16 @@
 
 ## Project Overview 📅
 
-A few days ago, I started working on an oximeter project based on the STM32G431KB NUCLEO board. I chose this board because it belongs to the latest G4 series from STM32, which offers impressive performance features such as a maximum clock frequency of 170 MHz. Although the SRAM memory on this board is somewhat limited, making screen buffering a challenging task, the high clock speed compensates for this by providing robust processing capabilities. 🛠️
+A few days ago, I started working on an oximeter project based on the STM32G431KB NUCLEO board. I chose this board because it belongs to the latest G4 series from STM32, which offers impressive performance features such as a maximum clock frequency of 170 MHz. Although the SRAM memory on this board is somewhat limited (only 16mB+6mB+10mB), making screen buffering a challenging task, the high clock speed compensates for this by providing robust processing capabilities. 🛠️
 
 ## Hardware Components 🔧
 
 ### Display 📺
 
-For the display, I selected a 1.47" LCD IPS screen from Waveshare, which I connected via SPI1. This display provides a clear and vibrant interface for showing the oximeter readings, but its integration requires careful management of the limited SRAM on the STM32G431KB.
+For the display, I selected a 1.47" LCD IPS screen from Waveshare, which I connected via SPI1. This display provides a clear and vibrant interface for showing the oximeter readings, but its integration requires careful management of the limited SRAM on the STM32G431KB. Here below you have pinout map of LCD IPS SPI1 connection:
+![Oximeter Project](https://i.imgur.com/qE09dE0.png)
+![Oximeter Project](https://i.imgur.com/moJIyBc.png)
+The gray cable (BL) is not connected because we do not use it.
 
 ### Sensor 🩺
 

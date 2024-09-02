@@ -1,0 +1,9 @@
+../Core/Src/MAX30102_Oximeter.c:12:17:MAX30102_CheckConnection	2
+../Core/Src/MAX30102_Oximeter.c:30:6:MAX30102_ResetSensor	1
+../Core/Src/MAX30102_Oximeter.c:39:17:MAX30102_LEDConfig	3
+../Core/Src/MAX30102_Oximeter.c:60:17:MAX30102_SetSpO2Mode	3
+../Core/Src/MAX30102_Oximeter.c:82:17:MAX30102_SlotCofig	2
+../Core/Src/MAX30102_Oximeter.c:95:17:MAX30102_ResetFIFOPointers	4
+../Core/Src/MAX30102_Oximeter.c:118:17:MAX30102_DataCollectTurnOn	2
+../Core/Src/MAX30102_Oximeter.c:131:6:MAX30102_GetHeartbeatSPO2	1
+../Core/Src/MAX30102_Oximeter.c:147:7:MAX30102_GetTemperature	1

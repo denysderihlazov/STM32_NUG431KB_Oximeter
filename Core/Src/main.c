@@ -18,6 +18,11 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "i2c.h"
+#include "spi.h"
+#include "tim.h"
+#include "usart.h"
+#include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -30,6 +35,9 @@
 #include "DEV_Config.h"
 #include "LCD_1in47.h"
 
+// Pulse oximeter MAX30102 library
+//#include "MAX30102_Oximeter.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -39,6 +47,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define MAX30102_I2C_ADDRESS    0x57
 
 /* USER CODE END PD */
 
@@ -48,25 +57,24 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-SPI_HandleTypeDef hspi1;
-
-TIM_HandleTypeDef htim2;
-TIM_HandleTypeDef htim3;
-
-UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+// Read Buffer for oximeter MAX30102
+uint8_t rbuf[6];
+
+uint8_t spo2 = 				0; // Oxygen saturation level in red blood cells
+uint32_t heartbeat = 		0; // Heart beats per minute
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-static void MX_USART2_UART_Init(void);
-static void MX_SPI1_Init(void);
-static void MX_TIM2_Init(void);
-static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
+void SystemClock_Config(void);
+void MAX30102_Init(void);
+void MAX30102_StartCollect(void);
+void MAX30102_GetHeartbeatSPO2(uint8_t *spo2, uint32_t *heartbeat);
+float MAX30102_GetTemperature(void);
 
 /* USER CODE END PFP */
 
@@ -121,10 +129,87 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_SPI1_Init();
-  MX_TIM2_Init();
   MX_TIM3_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
   initLCD();
+
+
+
+  /* IIC MAX30102 Polling Method */
+//  if(MAX30102_CheckConnection() == OXIMETER_OK)
+//  {
+//	  MAX30102_ResetSensor();
+//
+//	  MAX30102_LEDConfig();
+//
+//	  MAX30102_SetSpO2Mode();
+//
+//	  MAX30102_SlotCofig();
+//
+//	  MAX30102_ResetFIFOPointers();
+//
+//	  MAX30102_DataCollectTurnOn();
+//  }
+
+  uint8_t mode_reset = 0x40; // Reset bit
+  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x09, I2C_MEMADD_SIZE_8BIT, &mode_reset, 1, HAL_MAX_DELAY);
+  HAL_Delay(100); // Wait for reset
+
+  // Clear the reset bit
+  uint8_t mode_config = 0x03; // Set to SpO2 mode
+  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x09, I2C_MEMADD_SIZE_8BIT, &mode_config, 1, HAL_MAX_DELAY);
+
+  // Configure LED current (max for both LEDs)
+  uint8_t led1_pa = 0x7F; // Red LED current
+  uint8_t led2_pa = 0x7F; // IR LED current
+  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x0C, I2C_MEMADD_SIZE_8BIT, &led1_pa, 1, HAL_MAX_DELAY);
+  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x0D, I2C_MEMADD_SIZE_8BIT, &led2_pa, 1, HAL_MAX_DELAY);
+
+  // Set SpO2 configuration (ADC range, sample rate, pulse width)
+  uint8_t spo2_config = 0x27; // 0x27 sets sample rate to 100 Hz, pulse width to 411us
+  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x0A, I2C_MEMADD_SIZE_8BIT, &spo2_config, 1, HAL_MAX_DELAY);
+
+  // Enable slots (Slot 1: Red, Slot 2: IR)
+  uint8_t slot_config = 0x21; // Slot 1 for Red, Slot 2 for IR
+  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x11, I2C_MEMADD_SIZE_8BIT, &slot_config, 1, HAL_MAX_DELAY);
+
+  // Reset FIFO pointers
+  uint8_t fifo_config = 0x00;
+  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x04, I2C_MEMADD_SIZE_8BIT, &fifo_config, 1, HAL_MAX_DELAY); // FIFO Write Pointer
+  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x05, I2C_MEMADD_SIZE_8BIT, &fifo_config, 1, HAL_MAX_DELAY); // FIFO Overflow Counter
+  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x06, I2C_MEMADD_SIZE_8BIT, &fifo_config, 1, HAL_MAX_DELAY); // FIFO Read Pointer
+
+
+
+  uint8_t start_collect[2] =  {0x00, 0x01}; // Command to start data collection
+  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x20, I2C_MEMADD_SIZE_8BIT, &start_collect, 2, HAL_MAX_DELAY);
+
+
+
+  void MAX30102_GetHeartbeatSPO2(uint8_t *spo2, uint32_t *heartbeat)
+  {
+	  uint8_t rbuf[8]; // Buffer to store the read data
+
+	  // Read from the register where SPO2 and Heartbeat data are stored
+	  HAL_I2C_Mem_Read(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x0C, I2C_MEMADD_SIZE_8BIT, rbuf, 8, HAL_MAX_DELAY);
+
+	  // Extract SPO2 and Heartbeat data
+	  *spo2 = rbuf[0]; // SPO2 level
+	  *heartbeat = (rbuf[2] << 24) | (rbuf[3] << 16) | (rbuf[4] << 8) | rbuf[5]; // Heartbeat rate
+  }
+
+
+  float MAX30102_GetTemperature(void)
+  {
+	  uint8_t temp_buf[2];
+	  HAL_I2C_Mem_Read(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x14, I2C_MEMADD_SIZE_8BIT, temp_buf, 2, HAL_MAX_DELAY);
+
+	  // Convert the temperature data
+	  float temperature = temp_buf[0] + temp_buf[1] / 100.0;
+	  return temperature;
+  }
+
 
   /* USER CODE END 2 */
 
@@ -132,21 +217,43 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  /* Get SPO2 and Heartbeat values */
+	  void MAX30102_GetHeartbeatSPO2(uint8_t *spo2, uint32_t *heartbeat);
+
+	  /* Prepare text for SPO2 and Heartbeat values */
+	  char spo2Text[50];
+	  sprintf(spo2Text, "SPO2: %d%%", spo2);\
+	  Paint_DrawString_EN(0, 70, spo2Text, &Font16, BLACK, WHITE); // Display SPO2 on the screen
+
+	  char heartbeatText[50];
+	  sprintf(heartbeatText, "bpm: %lu", heartbeat);
+	  Paint_DrawString_EN(0, 120, heartbeatText, &Font16, BLACK, WHITE); // Display Heartbeat on the screen
+
+
+	  /* Get and format temperature */
+	  float temperature = MAX30102_GetTemperature();
+
+	  char temperatureText[50];
+	  sprintf(temperatureText, "T: %.2f C", temperature); // Format Temperature string
+	  Paint_DrawString_EN(0, 250, temperatureText, &Font16, BLACK, WHITE); // Display Temperature on the screen
+
 
 	  // Draw text at different coordinates to test the LCD
 	  Paint_DrawString_EN(0, 50, "dwd1", &Font16, BLACK, WHITE);
-	  Paint_DrawString_EN(125, 20, "dwd2", &Font16, BLACK, WHITE);
-	  Paint_DrawString_EN(0, 30, "dwd3", &Font16, BLACK, WHITE);
-	  Paint_DrawString_EN(65, 80, "dwd4", &Font16, BLACK, WHITE);
-	  Paint_DrawString_EN(70, 120, "dwd5", &Font16, BLACK, WHITE);
-	  Paint_DrawString_EN(70, 140, "dwd6", &Font16, BLACK, WHITE);
-	  Paint_DrawString_EN(70, 170, "dwd7", &Font16, BLACK, WHITE);
-	  Paint_DrawString_EN(70, 190, "dwd8", &Font16, BLACK, WHITE);
-	  Paint_DrawString_EN(70, 200, "dwd9", &Font16, BLACK, WHITE);
 
-	  Paint_DrawString_EN(70, 240, "dwd10", &Font16, BLACK, WHITE);
-	  Paint_DrawString_EN(70, 260, "dwd11", &Font24, BLACK, WHITE);
-	  Paint_DrawString_EN(60, 290, "dwd12", &Font24, BLACK, WHITE);
+
+//	  Paint_DrawString_EN(125, 20, "dwd2", &Font16, BLACK, WHITE);
+//	  Paint_DrawString_EN(0, 30, "dwd3", &Font16, BLACK, WHITE);
+//	  Paint_DrawString_EN(65, 80, "dwd4", &Font16, BLACK, WHITE);
+//	  Paint_DrawString_EN(70, 120, "dwd5", &Font16, BLACK, WHITE);
+//	  Paint_DrawString_EN(70, 140, "dwd6", &Font16, BLACK, WHITE);
+//	  Paint_DrawString_EN(70, 170, "dwd7", &Font16, BLACK, WHITE);
+//	  Paint_DrawString_EN(70, 190, "dwd8", &Font16, BLACK, WHITE);
+//	  Paint_DrawString_EN(70, 200, "dwd9", &Font16, BLACK, WHITE);
+//
+//	  Paint_DrawString_EN(70, 240, "dwd10", &Font16, BLACK, WHITE);
+//	  Paint_DrawString_EN(70, 260, "dwd11", &Font24, BLACK, WHITE);
+//	  Paint_DrawString_EN(60, 290, "dwd12", &Font24, BLACK, WHITE);
 
     /* USER CODE END WHILE */
 
@@ -199,228 +306,6 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-}
-
-/**
-  * @brief SPI1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI1_Init(void)
-{
-
-  /* USER CODE BEGIN SPI1_Init 0 */
-
-  /* USER CODE END SPI1_Init 0 */
-
-  /* USER CODE BEGIN SPI1_Init 1 */
-
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 7;
-  hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
-  hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI1_Init 2 */
-
-  /* USER CODE END SPI1_Init 2 */
-
-}
-
-/**
-  * @brief TIM2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM2_Init(void)
-{
-
-  /* USER CODE BEGIN TIM2_Init 0 */
-
-  /* USER CODE END TIM2_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM2_Init 1 */
-
-  /* USER CODE END TIM2_Init 1 */
-  htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 0;
-  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 4294967295;
-  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM2_Init 2 */
-
-  /* USER CODE END TIM2_Init 2 */
-
-}
-
-/**
-  * @brief TIM3 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM3_Init(void)
-{
-
-  /* USER CODE BEGIN TIM3_Init 0 */
-
-  /* USER CODE END TIM3_Init 0 */
-
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
-
-  /* USER CODE BEGIN TIM3_Init 1 */
-
-  /* USER CODE END TIM3_Init 1 */
-  htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 0;
-  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 65535;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM3_Init 2 */
-
-  /* USER CODE END TIM3_Init 2 */
-  HAL_TIM_MspPostInit(&htim3);
-
-}
-
-/**
-  * @brief USART2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART2_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART2_Init 0 */
-
-  /* USER CODE END USART2_Init 0 */
-
-  /* USER CODE BEGIN USART2_Init 1 */
-
-  /* USER CODE END USART2_Init 1 */
-  huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
-  huart2.Init.WordLength = UART_WORDLENGTH_8B;
-  huart2.Init.StopBits = UART_STOPBITS_1;
-  huart2.Init.Parity = UART_PARITY_NONE;
-  huart2.Init.Mode = UART_MODE_TX_RX;
-  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart2.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetTxFifoThreshold(&huart2, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetRxFifoThreshold(&huart2, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_DisableFifoMode(&huart2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART2_Init 2 */
-
-  /* USER CODE END USART2_Init 2 */
-
-}
-
-/**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_GPIO_Init(void)
-{
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-/* USER CODE BEGIN MX_GPIO_Init_1 */
-/* USER CODE END MX_GPIO_Init_1 */
-
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOF_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, DC_Pin|RST_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, CS_Pin|LD2_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pins : DC_Pin RST_Pin */
-  GPIO_InitStruct.Pin = DC_Pin|RST_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : CS_Pin LD2_Pin */
-  GPIO_InitStruct.Pin = CS_Pin|LD2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-/* USER CODE BEGIN MX_GPIO_Init_2 */
-/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
