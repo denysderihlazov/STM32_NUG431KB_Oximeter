@@ -130,7 +130,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_SPI1_Init();
   MX_TIM3_Init();
-  MX_I2C1_Init();
+  MX_I2C2_Init();
   /* USER CODE BEGIN 2 */
   initLCD();
 
@@ -153,37 +153,37 @@ int main(void)
 //  }
 
   uint8_t mode_reset = 0x40; // Reset bit
-  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x09, I2C_MEMADD_SIZE_8BIT, &mode_reset, 1, HAL_MAX_DELAY);
+  HAL_I2C_Mem_Write(&hi2c2, MAX30102_I2C_ADDRESS << 1, 0x09, I2C_MEMADD_SIZE_8BIT, &mode_reset, 1, HAL_MAX_DELAY);
   HAL_Delay(100); // Wait for reset
 
   // Clear the reset bit
   uint8_t mode_config = 0x03; // Set to SpO2 mode
-  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x09, I2C_MEMADD_SIZE_8BIT, &mode_config, 1, HAL_MAX_DELAY);
+  HAL_I2C_Mem_Write(&hi2c2, MAX30102_I2C_ADDRESS << 1, 0x09, I2C_MEMADD_SIZE_8BIT, &mode_config, 1, HAL_MAX_DELAY);
 
   // Configure LED current (max for both LEDs)
   uint8_t led1_pa = 0x7F; // Red LED current
   uint8_t led2_pa = 0x7F; // IR LED current
-  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x0C, I2C_MEMADD_SIZE_8BIT, &led1_pa, 1, HAL_MAX_DELAY);
-  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x0D, I2C_MEMADD_SIZE_8BIT, &led2_pa, 1, HAL_MAX_DELAY);
+  HAL_I2C_Mem_Write(&hi2c2, MAX30102_I2C_ADDRESS << 1, 0x0C, I2C_MEMADD_SIZE_8BIT, &led1_pa, 1, HAL_MAX_DELAY);
+  HAL_I2C_Mem_Write(&hi2c2, MAX30102_I2C_ADDRESS << 1, 0x0D, I2C_MEMADD_SIZE_8BIT, &led2_pa, 1, HAL_MAX_DELAY);
 
   // Set SpO2 configuration (ADC range, sample rate, pulse width)
   uint8_t spo2_config = 0x27; // 0x27 sets sample rate to 100 Hz, pulse width to 411us
-  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x0A, I2C_MEMADD_SIZE_8BIT, &spo2_config, 1, HAL_MAX_DELAY);
+  HAL_I2C_Mem_Write(&hi2c2, MAX30102_I2C_ADDRESS << 1, 0x0A, I2C_MEMADD_SIZE_8BIT, &spo2_config, 1, HAL_MAX_DELAY);
 
   // Enable slots (Slot 1: Red, Slot 2: IR)
   uint8_t slot_config = 0x21; // Slot 1 for Red, Slot 2 for IR
-  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x11, I2C_MEMADD_SIZE_8BIT, &slot_config, 1, HAL_MAX_DELAY);
+  HAL_I2C_Mem_Write(&hi2c2, MAX30102_I2C_ADDRESS << 1, 0x11, I2C_MEMADD_SIZE_8BIT, &slot_config, 1, HAL_MAX_DELAY);
 
   // Reset FIFO pointers
   uint8_t fifo_config = 0x00;
-  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x04, I2C_MEMADD_SIZE_8BIT, &fifo_config, 1, HAL_MAX_DELAY); // FIFO Write Pointer
-  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x05, I2C_MEMADD_SIZE_8BIT, &fifo_config, 1, HAL_MAX_DELAY); // FIFO Overflow Counter
-  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x06, I2C_MEMADD_SIZE_8BIT, &fifo_config, 1, HAL_MAX_DELAY); // FIFO Read Pointer
+  HAL_I2C_Mem_Write(&hi2c2, MAX30102_I2C_ADDRESS << 1, 0x04, I2C_MEMADD_SIZE_8BIT, &fifo_config, 1, HAL_MAX_DELAY); // FIFO Write Pointer
+  HAL_I2C_Mem_Write(&hi2c2, MAX30102_I2C_ADDRESS << 1, 0x05, I2C_MEMADD_SIZE_8BIT, &fifo_config, 1, HAL_MAX_DELAY); // FIFO Overflow Counter
+  HAL_I2C_Mem_Write(&hi2c2, MAX30102_I2C_ADDRESS << 1, 0x06, I2C_MEMADD_SIZE_8BIT, &fifo_config, 1, HAL_MAX_DELAY); // FIFO Read Pointer
 
 
 
   uint8_t start_collect[2] =  {0x00, 0x01}; // Command to start data collection
-  HAL_I2C_Mem_Write(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x20, I2C_MEMADD_SIZE_8BIT, &start_collect, 2, HAL_MAX_DELAY);
+  HAL_I2C_Mem_Write(&hi2c2, MAX30102_I2C_ADDRESS << 1, 0x20, I2C_MEMADD_SIZE_8BIT, (uint8_t*)&start_collect, 2, HAL_MAX_DELAY);
 
 
 
@@ -192,7 +192,7 @@ int main(void)
 	  uint8_t rbuf[8]; // Buffer to store the read data
 
 	  // Read from the register where SPO2 and Heartbeat data are stored
-	  HAL_I2C_Mem_Read(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x0C, I2C_MEMADD_SIZE_8BIT, rbuf, 8, HAL_MAX_DELAY);
+	  HAL_I2C_Mem_Read(&hi2c2, MAX30102_I2C_ADDRESS << 1, 0x0C, I2C_MEMADD_SIZE_8BIT, rbuf, 8, HAL_MAX_DELAY);
 
 	  // Extract SPO2 and Heartbeat data
 	  *spo2 = rbuf[0]; // SPO2 level
@@ -203,7 +203,7 @@ int main(void)
   float MAX30102_GetTemperature(void)
   {
 	  uint8_t temp_buf[2];
-	  HAL_I2C_Mem_Read(&hi2c1, MAX30102_I2C_ADDRESS << 1, 0x14, I2C_MEMADD_SIZE_8BIT, temp_buf, 2, HAL_MAX_DELAY);
+	  HAL_I2C_Mem_Read(&hi2c2, MAX30102_I2C_ADDRESS << 1, 0x14, I2C_MEMADD_SIZE_8BIT, temp_buf, 2, HAL_MAX_DELAY);
 
 	  // Convert the temperature data
 	  float temperature = temp_buf[0] + temp_buf[1] / 100.0;
@@ -218,7 +218,8 @@ int main(void)
   while (1)
   {
 	  /* Get SPO2 and Heartbeat values */
-	  void MAX30102_GetHeartbeatSPO2(uint8_t *spo2, uint32_t *heartbeat);
+	  MAX30102_GetHeartbeatSPO2(&spo2, &heartbeat);
+
 
 	  /* Prepare text for SPO2 and Heartbeat values */
 	  char spo2Text[50];
@@ -239,9 +240,9 @@ int main(void)
 
 
 	  // Draw text at different coordinates to test the LCD
-	  Paint_DrawString_EN(0, 50, "dwd1", &Font16, BLACK, WHITE);
-
-
+//	  Paint_DrawString_EN(0, 50, "dwd1", &Font16, BLACK, WHITE);
+//
+//
 //	  Paint_DrawString_EN(125, 20, "dwd2", &Font16, BLACK, WHITE);
 //	  Paint_DrawString_EN(0, 30, "dwd3", &Font16, BLACK, WHITE);
 //	  Paint_DrawString_EN(65, 80, "dwd4", &Font16, BLACK, WHITE);
